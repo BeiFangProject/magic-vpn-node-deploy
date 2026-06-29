@@ -138,6 +138,12 @@ region_from_country() {
   esac
 }
 
+write_env() {
+  local key="$1"
+  local value="$2"
+  printf '%s=%q\n' "${key}" "${value}"
+}
+
 echo "[1/7] Preparing low-memory server..."
 ensure_swap
 dnf clean all || true
@@ -183,23 +189,23 @@ fi
 
 echo "[5/7] Writing node env..."
 mkdir -p "${INSTALL_DIR}/config"
-cat >"${INSTALL_DIR}/config/node.env" <<ENV
-NODE_ID=
-NODE_NAME=${NODE_NAME}
-NODE_TOKEN=
-CONTROL_API_URL=
-NODE_REGION=${NODE_REGION}
-NODE_COUNTRY_CODE=${NODE_COUNTRY_CODE}
-NODE_CITY=${NODE_CITY}
-WG_INTERFACE=wg0
-WG_PORT=${WG_PORT}
-WG_ADDRESS=${WG_ADDRESS}
-WG_CONFIG_PATH=/etc/wireguard/wg0.conf
-ENDPOINT_HOST=${ENDPOINT_HOST}
-PUBLIC_IP=${PUBLIC_IP}
-PUBLIC_INTERFACE=
-CLIENT_DNS=1.1.1.1
-ENV
+{
+  write_env NODE_ID ""
+  write_env NODE_NAME "${NODE_NAME}"
+  write_env NODE_TOKEN ""
+  write_env CONTROL_API_URL ""
+  write_env NODE_REGION "${NODE_REGION}"
+  write_env NODE_COUNTRY_CODE "${NODE_COUNTRY_CODE}"
+  write_env NODE_CITY "${NODE_CITY}"
+  write_env WG_INTERFACE "wg0"
+  write_env WG_PORT "${WG_PORT}"
+  write_env WG_ADDRESS "${WG_ADDRESS}"
+  write_env WG_CONFIG_PATH "/etc/wireguard/wg0.conf"
+  write_env ENDPOINT_HOST "${ENDPOINT_HOST}"
+  write_env PUBLIC_IP "${PUBLIC_IP}"
+  write_env PUBLIC_INTERFACE ""
+  write_env CLIENT_DNS "1.1.1.1"
+} >"${INSTALL_DIR}/config/node.env"
 
 echo "[6/7] Installing node server requirements..."
 bash "${INSTALL_DIR}/deploy/install-centos9.sh"
