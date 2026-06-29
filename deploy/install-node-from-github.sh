@@ -16,6 +16,8 @@ NODE_CITY="${NODE_CITY:-}"
 WG_PORT="${WG_PORT:-51820}"
 WG_ADDRESS="${WG_ADDRESS:-10.66.0.1/24}"
 ENDPOINT_HOST="${ENDPOINT_HOST:-}"
+SWAP_FILE="${SWAP_FILE:-/swapfile}"
+SWAP_SIZE="${SWAP_SIZE:-1G}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -69,6 +71,32 @@ if [[ -z "${REPO_URL}" ]]; then
   exit 1
 fi
 
+ensure_swap() {
+  if swapon --show | grep -q .; then
+    echo "Swap already enabled."
+    return
+  fi
+
+  echo "No swap detected. Creating ${SWAP_SIZE} swap at ${SWAP_FILE} before installing packages..."
+  if command -v fallocate >/dev/null 2>&1; then
+    fallocate -l "${SWAP_SIZE}" "${SWAP_FILE}" || dd if=/dev/zero of="${SWAP_FILE}" bs=1M count=1024
+  else
+    dd if=/dev/zero of="${SWAP_FILE}" bs=1M count=1024
+  fi
+
+  chmod 600 "${SWAP_FILE}"
+  mkswap "${SWAP_FILE}"
+  swapon "${SWAP_FILE}"
+
+  if ! grep -q "^${SWAP_FILE} " /etc/fstab; then
+    echo "${SWAP_FILE} none swap sw 0 0" >>/etc/fstab
+  fi
+}
+
+dnf_install() {
+  dnf -y --setopt=install_weak_deps=False --setopt=max_parallel_downloads=1 install "$@"
+}
+
 detect_public_ip() {
   curl -fsS4 https://api.ipify.org 2>/dev/null || \
     curl -fsS4 https://ifconfig.me 2>/dev/null || \
@@ -110,10 +138,14 @@ region_from_country() {
   esac
 }
 
-echo "[1/6] Installing git and helpers..."
-dnf -y install git curl python3 >/dev/null
+echo "[1/7] Preparing low-memory server..."
+ensure_swap
+dnf clean all || true
 
-echo "[2/6] Detecting server location..."
+echo "[2/7] Installing git and helpers..."
+dnf_install git curl python3 >/dev/null
+
+echo "[3/7] Detecting server location..."
 PUBLIC_IP="$(detect_public_ip)"
 GEO_JSON="$(detect_geo_json)"
 DETECTED_COUNTRY="$(printf '%s' "${GEO_JSON}" | json_value country_code)"
@@ -140,7 +172,7 @@ echo "Detected public IP: ${PUBLIC_IP}"
 echo "Detected location: ${NODE_COUNTRY_CODE} / ${NODE_CITY} / ${NODE_REGION}"
 echo "Node name: ${NODE_NAME}"
 
-echo "[3/6] Pulling project from GitHub..."
+echo "[4/7] Pulling project from GitHub..."
 if [[ -d "${INSTALL_DIR}/.git" ]]; then
   git -C "${INSTALL_DIR}" fetch origin "${BRANCH}"
   git -C "${INSTALL_DIR}" reset --hard "origin/${BRANCH}"
@@ -149,7 +181,7 @@ else
   git clone --branch "${BRANCH}" "${REPO_URL}" "${INSTALL_DIR}"
 fi
 
-echo "[4/6] Writing node env..."
+echo "[5/7] Writing node env..."
 mkdir -p "${INSTALL_DIR}/config"
 cat >"${INSTALL_DIR}/config/node.env" <<ENV
 NODE_ID=
@@ -169,10 +201,10 @@ PUBLIC_INTERFACE=
 CLIENT_DNS=1.1.1.1
 ENV
 
-echo "[5/6] Installing node server requirements..."
+echo "[6/7] Installing node server requirements..."
 bash "${INSTALL_DIR}/deploy/install-centos9.sh"
 
-echo "[6/6] Setting up WireGuard..."
+echo "[7/7] Setting up WireGuard..."
 ENV_FILE="${INSTALL_DIR}/config/node.env" bash "${INSTALL_DIR}/deploy/setup-wireguard-node.sh"
 
 echo
