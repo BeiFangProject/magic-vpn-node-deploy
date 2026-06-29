@@ -68,8 +68,8 @@ PrivateKey = ${PRIVATE_KEY}
 SaveConfig = false
 
 # NAT outbound VPN client traffic through the public interface.
-PostUp = firewall-cmd --zone=public --add-masquerade; iptables -t nat -A POSTROUTING -o ${PUBLIC_INTERFACE} -j MASQUERADE
-PostDown = firewall-cmd --zone=public --remove-masquerade; iptables -t nat -D POSTROUTING -o ${PUBLIC_INTERFACE} -j MASQUERADE
+PostUp = iptables -t nat -C POSTROUTING -o ${PUBLIC_INTERFACE} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o ${PUBLIC_INTERFACE} -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -o ${PUBLIC_INTERFACE} -j MASQUERADE 2>/dev/null || true
 WGCONF
 
 chmod 600 "${WG_CONFIG_PATH}"
