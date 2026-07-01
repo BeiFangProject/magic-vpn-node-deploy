@@ -44,7 +44,7 @@ echo "[2/8] Updating CentOS 9 packages..."
 dnf -y --setopt=install_weak_deps=False --setopt=max_parallel_downloads=1 update
 
 echo "[3/8] Installing base tools..."
-dnf_install dnf-plugins-core curl wget git vim firewalld tar gzip jq iproute iptables
+dnf_install dnf-plugins-core curl wget git vim firewalld tar gzip jq iproute iptables python3
 
 echo "[4/8] Enabling repositories..."
 dnf_install epel-release || true
